@@ -175,39 +175,63 @@ int createAuthHeader(
         return 0;
     }
 
-    if ((start = stristr(auth, "algorithm=")) != nullptr) {
-        start = start + strlen("algorithm=");
+    /* Scan all algorithm= occurrences and prefer SHA-256 when available.
+     * This handles the case where the server sends multiple
+     * WWW-Authenticate headers with different algorithms. RFC 8760. */
+    const char *selected_auth = auth;
+    const char *scan = auth;
+    while ((start = stristr(scan, "algorithm=")) != nullptr) {
+        start += strlen("algorithm=");
         if (*start == '"') {
             start++;
         }
         end = start + strcspn(start, " ,\"\r\n");
-        strncpy(algo, start, end - start);
-        algo[end - start] ='\0';
 
+        char current_algo[32];
+        strncpy(current_algo, start, end - start);
+        current_algo[end - start] = '\0';
+
+        if (strncasecmp(current_algo, "SHA-256", 7) == 0) {
+            strncpy(algo, "SHA-256", sizeof(algo));
+            /* Find the Digest challenge that contains this algorithm */
+            const char *digest = start;
+            while (digest > auth && strncasecmp(digest, "Digest", 6) != 0) {
+                digest--;
+            }
+            if (strncasecmp(digest, "Digest", 6) == 0) {
+                selected_auth = digest;
+            }
+            break;
+        }
+
+        /* Use the first algorithm encountered as fallback */
+        if (strncasecmp(algo, "MD5", 3) == 0) {
+            strncpy(algo, current_algo, sizeof(algo));
+        }
+
+        scan = (const char *)end;
     }
 
     if (strncasecmp(algo, "MD5", 3)==0) {
         return createAuthHeaderMD5(
             user, password, strlen(password), method, uri, msgbody,
-            auth, algo, nonce_count, result, result_len);
+            selected_auth, algo, nonce_count, result, result_len);
     } else if (strncasecmp(algo, "AKAv1-MD5", 9)==0) {
         if (!aka_K) {
             snprintf(result, result_len, "createAuthHeader: AKAv1-MD5 authentication requires a key");
             return 0;
         }
         return createAuthHeaderAKAv1MD5(
-            user, aka_OP, aka_AMF, aka_K, method, uri, msgbody, auth,
-            algo, nonce_count, result, result_len);
+            user, aka_OP, aka_AMF, aka_K, method, uri, msgbody,
+            selected_auth, algo, nonce_count, result, result_len);
     } else if (strncasecmp(algo, "SHA-256", 7)==0) {
         return createAuthHeaderSHA256(
             user, password, strlen(password), method, uri, msgbody,
-            auth, algo, nonce_count, result, result_len);
+            selected_auth, algo, nonce_count, result, result_len);
     } else {
         snprintf(result, result_len, "createAuthHeader: authentication must use MD5, AKAv1-MD5 or SHA-256");
         return 0;
     }
-
-
 }
 
 
@@ -323,6 +347,7 @@ static int createAuthResponseMD5(
     EVP_DigestFinal_ex(mdctx, resp, &digest_len);
     hashToHex(&resp[0], result, MD5_HASH_SIZE);
 
+    EVP_MD_CTX_free(mdctx);
     return 1;
 }
 

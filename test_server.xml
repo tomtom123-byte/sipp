@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="ISO-8859-1" ?>
+<!DOCTYPE scenario SYSTEM "sipp.dtd">
+
+<scenario name="UAS with MD5+SHA256 auth challenge">
+  <!-- Receive initial REGISTER -->
+  <recv request="REGISTER" crlf="true">
+    <action>
+      <ereg regexp="&lt;(.*)&gt;" search_in="hdr" header="Contact:" check_it="true" assign_to="1,2" />
+      <assign assign_to="1" variable="2"/>
+    </action>
+  </recv>
+
+  <!-- Send 401 with both MD5 and SHA-256 challenges -->
+  <send>
+    <![CDATA[
+
+      SIP/2.0 401 Unauthorized
+      [last_Via:]
+      [last_From:]
+      [last_To:];tag=[call_number]
+      [last_Call-ID:]
+      [last_CSeq:]
+      WWW-Authenticate: Digest realm="testrealm@host.com", nonce="dcd98b7102dd2f0e8b11d0f600bfb0c093", algorithm=MD5, qop="auth", opaque="5ccc069c403ebaf9f0171e9517f40e41"
+      WWW-Authenticate: Digest realm="testrealm@host.com", nonce="ZaGxV2WhsCtREI2EsiD1LR0RYd", algorithm=SHA-256, qop="auth", opaque="5ccc069c403ebaf9f0171e9517f40e42"
+      Content-Length: 0
+
+    ]]>
+  </send>
+
+  <!-- Receive REGISTER with authentication -->
+  <recv request="REGISTER" crlf="true">
+  </recv>
+
+  <!-- Send 200 OK -->
+  <send>
+    <![CDATA[
+
+      SIP/2.0 200 OK
+      [last_Via:]
+      [last_From:]
+      [last_To:];tag=[call_number]
+      [last_Call-ID:]
+      [last_CSeq:]
+      [last_Contact:]
+      Expires: 3600
+      Content-Length: 0
+
+    ]]>
+  </send>
+
+  <ResponseTimeRepartition value="10, 20, 30, 40, 50, 100, 150, 200"/>
+  <CallLengthRepartition value="10, 50, 100, 500, 1000, 5000, 10000"/>
+</scenario>

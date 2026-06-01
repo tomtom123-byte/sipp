@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="ISO-8859-1" ?>
+<!DOCTYPE scenario SYSTEM "sipp.dtd">
+
+<scenario name="UAC with SHA-256 digest auth">
+  <send retrans="500">
+    <![CDATA[
+
+      REGISTER sip:[remote_ip]:[remote_port] SIP/2.0
+      Via: SIP/2.0/[transport] [local_ip]:[local_port];branch=[branch]
+      From: <sip:testuser@[remote_ip]:[remote_port]>;tag=[call_number]
+      To: <sip:testuser@[remote_ip]:[remote_port]>
+      Call-ID: [call_id]
+      CSeq: 1 REGISTER
+      Contact: <sip:testuser@[local_ip]:[local_port]>
+      Expires: 3600
+      Content-Length: 0
+
+    ]]>
+  </send>
+
+  <!-- Receive 401 challenge -->
+  <recv response="401" auth="true">
+  </recv>
+
+  <!-- Send REGISTER with authentication (will prefer SHA-256) -->
+  <send retrans="500">
+    <![CDATA[
+
+      REGISTER sip:[remote_ip]:[remote_port] SIP/2.0
+      Via: SIP/2.0/[transport] [local_ip]:[local_port];branch=[branch]
+      From: <sip:testuser@[remote_ip]:[remote_port]>;tag=[call_number]
+      To: <sip:testuser@[remote_ip]:[remote_port]>
+      Call-ID: [call_id]
+      CSeq: 2 REGISTER
+      Contact: <sip:testuser@[local_ip]:[local_port]>
+      [authentication username=testuser password=secret]
+      Expires: 3600
+      Content-Length: 0
+
+    ]]>
+  </send>
+
+  <!-- Receive 200 OK -->
+  <recv response="200">
+  </recv>
+
+  <ResponseTimeRepartition value="10, 20, 30, 40, 50, 100, 150, 200"/>
+  <CallLengthRepartition value="10, 50, 100, 500, 1000, 5000, 10000"/>
+</scenario>
