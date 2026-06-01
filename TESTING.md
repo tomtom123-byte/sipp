@@ -106,7 +106,82 @@ ACK → [5秒 pause] → BYE → 200 OK
 
 ---
 
+---
+
+## 試験3: 100ユーザ負荷試験（ループ回数は -m で制御）
+
+CSV からユーザ情報を読み取り、REGISTER + INVITE を実行します。ループ回数はコマンドラインの `-m` オプションで制御します（SIPp の制約により、XML 内の変数では制御できません）。
+
+### CSV フォーマット（100_users.csv）
+
+```
+SEQUENTIAL
+user001;pass001;user002  ← [field0];[field1];[field2]
+user002;pass002;user003
+...
+user100;pass100;user001
+```
+
+`-m` の計算式: `100ユーザ × ループ回数`
+
+| ループ回数 | `-m` 値 | 総コール数 |
+|:---------:|:-------:|:---------:|
+| 1 | `-m 100` | 100 calls |
+| 2 | `-m 200` | 200 calls |
+| 100（1万BHC） | `-m 10000` | 10,000 calls |
+
+### 手順
+
+**ターミナル1（UAS）:**
+
+```bash
+./sipp -sf test_server_full_100.xml -i 127.0.0.1 -p 5060 \
+  -trace_msg -message_file server_100_sip.log \
+  -default_behaviors none -aa -m 100
+```
+
+**ターミナル2（UAC）:**
+
+```bash
+./sipp -sf test_client_full_100.xml -i 127.0.0.1 -p 5061 \
+  127.0.0.1:5060 \
+  -trace_msg -message_file client_100_sip.log \
+  -default_behaviors none -r 1 -m 100 -l 100 \
+  -inf 100_users.csv
+```
+
+### 1万BHC（10,000 calls）実行例
+
+```bash
+./sipp -sf test_client_full_100.xml -i 127.0.0.1 -p 5061 \
+  127.0.0.1:5060 \
+  -trace_msg -message_file client_10k_bhc.log \
+  -default_behaviors none -r 3 -m 10000 -l 100 \
+  -inf 100_users.csv
+```
+
+### 補足: ループ回数の変更方法
+
+SIPp は XML 内から自由な変数名でのカウンタ制御をサポートしていないため、`-m` オプションでループ回数を指定します。シナリオ XML の編集は不要です。
+
+---
+
 ## オプションの説明
+
+| オプション | 説明 |
+|-----------|------|
+| `-sf <file>` | シナリオファイルを指定 |
+| `-i <ip>` | ローカル IP アドレス |
+| `-p <port>` | ローカルポート（UAS は待受ポート） |
+| `-trace_msg` | SIP メッセージをログファイルに出力 |
+| `-message_file <file>` | メッセージログの出力先ファイル |
+| `-default_behaviors none` | デフォルト動作（自動応答など）を無効化 |
+| `-aa` | 自動 200 OK 応答を有効化 |
+| `-m <n>` | 最大コール数 |
+| `-r <rate>` | コールレート（cps） |
+| `-l <n>` | 最大同時コール数 |
+| `-inf <file>` | インデックスファイル（CSV）を指定 |
+| `-timeout <sec>` | タイムアウト |
 
 | オプション | 説明 |
 |-----------|------|
